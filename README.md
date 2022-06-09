@@ -1,1 +1,1 @@
-# DCS-SimpleSpawn
+# DCS-TemplateSpawn
