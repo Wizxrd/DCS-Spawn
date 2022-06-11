@@ -8,10 +8,8 @@ local scheduleFunction = timer.scheduleFunction
 local getModelTime = timer.getTime
 local logwrite = log.write
 local format = string.format
-local debugSource = "spawn.lua"
 
-Util = {}
-function Util.DeepCopy(object)
+local function deepCopy(object)
     local copies = {}
     local function recursiveCopy(object)
         if type(object) ~= "table" then return object end
@@ -24,10 +22,6 @@ function Util.DeepCopy(object)
         return setmetatable(copy, getmetatable(object))
     end
     return recursiveCopy(object)
-end
-
-function Util.GetPayload(unitName)
-
 end
 
 -------------------------------------------
@@ -72,7 +66,7 @@ Spawn.Waypoint = {
 
 function Spawn:New(templateName, nickname)
     local self = Util.DeepCopy(setmetatable({}, {__index = Spawn}))
-    self.baseTemplate, self.staticTemplate = self:GetBaseTemplate(templateName)
+    self.baseTemplate, self.staticTemplate = self:GetTemplate(templateName)
     if not self.baseTemplate then
         self:Error("Spawn:New() | couldn't find template %s in database", templateName)
         return self
@@ -185,7 +179,7 @@ end
 ---------------------------------------------
 -- setters
 
-function Spawn:SetTemplateNames(keepGroupName, keepUnitNames)
+function Spawn:SetKeepNames(keepGroupName, keepUnitNames)
     self.keepGroupName = keepGroupName
     self.keepUnitNames = keepUnitNames
     return self
@@ -213,6 +207,7 @@ end
 function Spawn:SetLivery(unitId, livery)
     self.liveryId = unitId
     self.livery = livery
+    return self
 end
 
 function Spawn:SetDebugLevel(level)
@@ -267,15 +262,15 @@ function Spawn:GetStaticTemplate(staticName)
     end
 end
 
-function Spawn:GetBaseTemplate(templateName)
+function Spawn:GetTemplate(templateName)
     if groupsByName[templateName] then
-        self:Info("Spawn:GetBaseTemplate() | returning group template: "..templateName)
+        self:Info("Spawn:GetTemplate() | returning group template: "..templateName)
         return deepCopy(groupsByName[templateName])
     elseif unitsByName[templateName] then
-        self:Info("Spawn:GetBaseTemplate() | returning unit template: "..templateName)
+        self:Info("Spawn:GetTemplate() | returning unit template: "..templateName)
         return deepCopy(unitsByName[templateName])
     elseif staticsByName[templateName] then
-        self:Info("Spawn:GetBaseTemplate() | returning static template: "..templateName)
+        self:Info("Spawn:GetTemplate() | returning static template: "..templateName)
         return deepCopy(staticsByName[templateName]), true
     end
 end
@@ -370,49 +365,32 @@ end
 
 function Spawn:GetZoneTemplate(zoneName)
     if zonesByName[zoneName] then
-        self:Info("GetZoneTemplate() | returning zone template: "..zoneName)
         return deepCopy(zonesByName[zoneName])
     end
 end
 
-function Spawn:GetQuadZonePoints(vararg)
-    if vararg == "string" then
-        if zonesByName[vararg] then
-            local zone = zonesByName[vararg]
-            if zone.type == 2 and zone.vertices then
-                return deepCopy(zonesByName[vararg].vertices)
-            end
+function Spawn:GetQuadZonePoints(zoneName)
+    local zoneTemplate = self:GetZoneTemplate(zoneName)
+    if zoneTemplate then
+        if zoneTemplate.type == 2 then
+            return deepCopy(zoneTemplate.vertices)
         end
-    elseif vararg == "table" and vararg.vertices then
-        return deepCopy(vararg.vertices)
     end
 end
 
-function GetZoneRadius(vararg)
-    if type(vararg) == "string" then
-        local zone = Spawn:GetZoneTemplate(vararg)
-        return zone.radius
-    elseif type(vararg) == "table" then
-        return vararg.radius
+function Spawn:GetZoneRadius(zoneName)
+    local zoneTemplate = self:GetZoneTemplate(zoneName)
+    if zoneTemplate then
+        if zoneTemplate.type == 0 then
+            return deepCopy(zoneTemplate.radius)
+        end
     end
 end
 
-function Spawn:GetZoneVec3(vararg)
-    if type(vararg) == "string" then
-        local zone = self:GetZoneTemplate(vararg)
-        if zone then
-            return {
-                ["x"] = deepCopy(zone.x),
-                ["y"] = deepCopy(zone.y),
-                ["z"] = deepCopy(zone.z),
-            }
-        end
-    elseif type(vararg) == "table" then
-        return {
-            ["x"] = deepCopy(vararg.x),
-            ["y"] = deepCopy(vararg.y),
-            ["z"] = deepCopy(vararg.z),
-        }
+function Spawn:GetZoneVec3(zoneName)
+    local zone = self:GetZoneTemplate(zoneName)
+    if zone then
+        return deepCopy(zone.vec3)
     end
 end
 
@@ -506,119 +484,19 @@ function Spawn:ScheduleFunction(callback, params, timer)
     scheduleFunction(function() callback(unpack(params)) end, nil, getModelTime() + timer)
 end
 
--------------------------------------------
--- zone stuff
-
-function Spawn:GroupInZone(groupName, zoneName)
-    local group = Group.getByName(groupName)
-    if group then
-        local unit = group:getUnit(1)
-        local unitName = unit:getName()
-        return self:UnitInZone(unitName, zoneName)
+function Spawn:AddGroupTemplate(template)
+    groupsByName[template.name] = deepCopy(template)
+    for _, unitTemplate in pairs(template.units) do
+        self:AddUnitTemplate(unitTemplate)
     end
-    return false
 end
 
-function Spawn:UnitInZone(unitName, zoneName)
-    local unit = Unit.getByName(unitName)
-    if unit then
-        local zoneVec3 = self:GetZoneVec3(zoneName)
-        local unitVec3 = unit:getPoint()
-        return self:ObjectInZone(unitVec3, zoneVec3)
-    end
-    return false
+function Spawn:AddUnitTemplate(template)
+    unitsByName[template.name] = deepCopy(template)
 end
 
-function Spawn:StaticInZone(staticName, zoneName)
-    local static = StaticObject.getByName(staticName)
-    if static then
-        local zoneVec3 = self:GetZoneVec3(zoneName)
-        local staticVec3 = static:getPoint()
-        return self:ObjectInZone(staticVec3, zoneVec3)
-    end
-    return false
-end
-
-function Spawn:Vec3InZone(objectVec3, zoneVec3)
-    if ((objectVec3.x - zoneVec3.x)^2 + (objectVec3.z - zoneVec3.z)^2)^0.5 <= zone.radius then
-        return true
-    end
-    return false
-end
-
-function Spawn:GroupInQuadZone(groupName, zoneName)
-    local group = Group.getByName(groupName)
-    if group then
-        local unit = group:getUnit(1)
-        local unitName = unit:getName()
-        return self:UnitInQuadZone(unitName, zoneName)
-    end
-    return false
-end
-
-function Spawn:UnitInQuadZone(unitName, zoneName)
-    local unit = Unit.getByName(unitName)
-    if unit then
-        local zonePoints = self:GetQuadZonePoints(zoneName)
-        local unitVec3 = unit:getPoint()
-        return self:ObjectInPolygon(unitVec3, zonePoints)
-    end
-    return false
-end
-
-function Spawn:StaticInQuadZone(staticName, zoneName)
-    local static = StaticObject.getByName(staticName)
-    if static then
-        local zonePoints = self:GetQuadZonePoints(zoneName)
-        local staticVec3 = static:getPoint()
-        return self:ObjectInPolygon(staticVec3, zonePoints)
-    end
-    return false
-end
-
-function Spawn:GroupInPolygon(groupName, points)
-    local group = Group.getByName(groupName)
-    if group then
-        local unit = group:getUnit(1)
-        local unitName = unit:getName()
-        return self:UnitInPolygon(unitName, points)
-    end
-    return false
-end
-
-function Spawn:UnitInPolygon(unitName, points)
-    local unit = Unit.getByName(unitName)
-    if unit then
-        local unitVec3 = unit:getPoint()
-        return self:ObjectInPolygon(unitVec3, points)
-    end
-    return false
-end
-
-function Spawn:StaticInPolygon(staticName, points)
-    local static = StaticObject.getByName(staticName)
-    if static then
-        local staticVec3 = static:getPoint()
-        return self:ObjectInPolygonZone(staticVec3, points)
-    end
-    return false
-end
-
-function Spawn:ObjectInPolygon(objectVec3, points)
-    local vx = objectVec3.x
-    local vz = objectVec3.z
-    local count = 0
-    local polygon = deepCopy(points)
-    polygon[#polygon+1] = polygon[1]
-    for i = 1, #polygon do
-        if (polygon[i].z <= vz and polygon[i+1].z > vz) or (polygon[i].z > vz and polygon[i+1] <= vz) then
-            local vt = (vz - polygon[i].z) / (polygon[i+1].z - polygon[i].z)
-            if (vx < polygon[i].x + vt*(polygon[i+1].x - polygon[i].x)) then
-                count = count + 1
-            end
-        end
-    end
-    return count%2 == 1
+function Spawn:AddStaticTemplate(template)
+    staticsByName[template.units[1].name] = deepCopy(template)
 end
 
 -------------------------------------------
@@ -626,15 +504,22 @@ end
 
 function Spawn:SpawnToWorld()
     self._spawnTemplate = deepCopy(self.baseTemplate)
-    self:_prepareTemplate()
+    self:_InitializeTemplate()
     return self
 end
 
 function Spawn:SpawnFromTemplate(template, country, category, static)
     if static then
-        return addStaticObject(country, category, template)
+        local staticObject = addStaticObject(country, template)
+        template.countryId = country
+        self:AddStaticTemplate(template)
+        return staticObject
     else
-        return addGroup(country, category, template)
+        local group = addGroup(country, category, template)
+        template.countryId = country
+        template.categoryId = category
+        self:AddGroupTemplate(template)
+        return group
     end
 end
 
@@ -659,9 +544,10 @@ function Spawn:SpawnFromRandomZone(zoneList, alt)
 end
 
 function Spawn:SpawnFromRandomVec3InZone(zoneName, alt)
-    local spawnZone = self:GetZoneTemplate(zoneName)
-    local spawnZoneVec3 = self:GetZoneVec3(spawnZone)
-    local radius = spawnZone.radius * 0.75
+    local zone = self:GetZoneTemplate(zoneName)
+    local spawnZoneVec3 = zone.vec3
+    local spawnZoneRadius = zone.radius
+    local radius = spawnZoneRadius.radius * 0.75
     spawnZoneVec3.x = spawnZoneVec3.x + math.random(radius * -1, radius)
     spawnZoneVec3.z = spawnZoneVec3.z + math.random(radius * -1, radius)
     self:SpawnFromVec3(spawnZoneVec3, alt)
@@ -714,7 +600,7 @@ function Spawn:SpawnFromVec3(vec3, alt)
     self._spawnTemplate.route.points[1].alt = alt
     self._spawnTemplate.route.points[1].x = vec3.x
     self._spawnTemplate.route.points[1].y = vec3.z
-    self:_prepareTemplate()
+    self:_InitializeTemplate()
     return self
 end
 
@@ -764,7 +650,7 @@ function Spawn:SpawnFromAirbase(airbaseName, takeoff, terminals)
             self._spawnTemplate.route.points[1].x = spawnAirbaseVec3.x
             self._spawnTemplate.route.points[1].y = spawnAirbaseVec3.z
         end
-        self:_prepareTemplate()
+        self:_InitializeTemplate()
         return self
     end
 end
@@ -772,13 +658,13 @@ end
 -------------------------------------------
 -- template preperation
 
-function Spawn:_prepareTemplate()
-    self:_prepareNames()
-    self:_addToWorld()
+function Spawn:_InitializeTemplate()
+    self:_InitializeNames()
+    self:_AddToWorld()
     return self
 end
 
-function Spawn:_prepareNames()
+function Spawn:_InitializeNames()
     if not self.keepGroupName then
         if self.nickname then
             self._spawnTemplate.name = self.nickname
@@ -803,11 +689,12 @@ end
 -------------------------------------------
 -- add template to world
 
-function Spawn:_addToWorld()
+function Spawn:_AddToWorld()
     if self.staticTemplate then
         self.DCSStaticObject = addStaticObject(self.countryId, self._spawnTemplate.units[1])
         self.spawnCount = self.spawnCount + 1
-        self:Debug("Spawn:_addToWorld() | %s has been added into the world", self._spawnTemplate.units[1].name)
+        self:Debug("Spawn:_AddToWorld() | %s has been added into the world", self._spawnTemplate.units[1].name)
+        self:AddStaticTemplate(self._spawnTemplate)
     else
         if self.payload then
             self._spawnTemplate.units[self.payloadId].payload = self.payload
@@ -817,7 +704,8 @@ function Spawn:_addToWorld()
         end
         self.DCSGroup = addGroup(self.countryId, self.categoryId, self._spawnTemplate)
         self.spawnCount = self.spawnCount + 1
-        self:Debug("Spawn:_addToWorld() | %s has been added into the world", self._spawnTemplate.name)
+        self:Debug("Spawn:_AddToWorld() | %s has been added into the world", self._spawnTemplate.name)
+        self:AddGroupTemplate(self._spawnTemplate)
     end
     if self.scheduledFunction then
         self:ScheduleFunction()
@@ -844,7 +732,7 @@ do
             if self.DebugLevel and self.DebugLevel < level then
                 return
             end
-            logwrite(debugSource, log[data.level], format(message, ...))
+            logwrite("spawn.lua", log[data.level], format(message, ...))
         end
     end
 
@@ -893,9 +781,10 @@ do
     for _, zones in pairs(env.mission.triggers) do
         for _, zoneData in pairs(zones) do
             zonesByName[zoneData.name] = deepCopy(zoneData)
-            zonesByName[zoneData.name].x = zoneData.x
-            zonesByName[zoneData.name].y = land.getHeight({x = zoneData.x, y = zoneData.y})
-            zonesByName[zoneData.name].z = zoneData.y
+            zonesByName[zoneData.name].vec3 = {}
+            zonesByName[zoneData.name].vec3.x = zoneData.x
+            zonesByName[zoneData.name].vec3.y = land.getHeight({x = zoneData.x, y = zoneData.y})
+            zonesByName[zoneData.name].vec3.z = zoneData.y
         end
     end
 end
