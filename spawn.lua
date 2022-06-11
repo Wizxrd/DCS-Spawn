@@ -145,7 +145,7 @@ end
     staticTemplate
     waypoint
 ]]
-function Spawn:NewFromVars(varargs)
+function Spawn:NewFromVarargs(varargs)
     local spawnTemplate
     if varargs.staticTemplate then
         spawnTemplate = self:GetStaticSpawnTemplate()
