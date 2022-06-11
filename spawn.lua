@@ -8,10 +8,10 @@ local scheduleFunction = timer.scheduleFunction
 local getModelTime = timer.getTime
 local logwrite = log.write
 local format = string.format
+local debugSource = "spawn.lua"
 
-local debugSource = "SimpleSpawn.lua"
-
-local function deepCopy(object)
+Util = {}
+function Util.DeepCopy(object)
     local copies = {}
     local function recursiveCopy(object)
         if type(object) ~= "table" then return object end
@@ -24,6 +24,10 @@ local function deepCopy(object)
         return setmetatable(copy, getmetatable(object))
     end
     return recursiveCopy(object)
+end
+
+function Util.GetPayload(unitName)
+
 end
 
 -------------------------------------------
@@ -67,7 +71,7 @@ Spawn.Waypoint = {
 -------------------------------------------
 
 function Spawn:New(templateName, nickname)
-    local self = deepCopy(setmetatable({}, {__index = Spawn}))
+    local self = Util.DeepCopy(setmetatable({}, {__index = Spawn}))
     self.baseTemplate, self.staticTemplate = self:GetBaseTemplate(templateName)
     if not self.baseTemplate then
         self:Error("Spawn:New() | couldn't find template %s in database", templateName)
@@ -153,15 +157,20 @@ function Spawn:NewFromVarargs(varargs)
         spawnTemplate.units[1].category = varargs.category
         spawnTemplate.units[1].shape_name = varargs.shapeName
         spawnTemplate.units[1].type = varargs.type
+        spawnTemplate.units[1].heading = varargs.heading or 0
     else
         spawnTemplate = self:GetSpawnTemplate()
         spawnTemplate.countryId = varargs.countryId
         spawnTemplate.categoryId = varargs.categoryId
         spawnTemplate.name = varargs.name or varargs.type
-        spawnTemplate.units[1].type = varargs.type
-        spawnTemplate.units[1].skill = varargs.skill or "Random"
-        spawnTemplate.units[1].heading = varargs.heading or 0
-        spawnTemplate.units[1].playerCanDrive = varargs.canDrive or false
+        if varargs.units then
+            spawnTemplate.units = varargs.units
+        else
+            spawnTemplate.units[1].type = varargs.type
+            spawnTemplate.units[1].skill = varargs.skill or "Random"
+            spawnTemplate.units[1].heading = varargs.heading or 0
+            spawnTemplate.units[1].playerCanDrive = varargs.canDrive or false
+        end
         spawnTemplate.route.points[1].alt = varargs.alt or 0
         spawnTemplate.route.points[1].alt_type = varargs.altType or "BARO"
         if varargs.waypoint then
@@ -379,6 +388,15 @@ function Spawn:GetQuadZonePoints(vararg)
     end
 end
 
+function GetZoneRadius(vararg)
+    if type(vararg) == "string" then
+        local zone = Spawn:GetZoneTemplate(vararg)
+        return zone.radius
+    elseif type(vararg) == "table" then
+        return vararg.radius
+    end
+end
+
 function Spawn:GetZoneVec3(vararg)
     if type(vararg) == "string" then
         local zone = self:GetZoneTemplate(vararg)
@@ -521,7 +539,7 @@ function Spawn:StaticInZone(staticName, zoneName)
     return false
 end
 
-function Spawn:ObjectInZone(objectVec3, zoneVec3)
+function Spawn:Vec3InZone(objectVec3, zoneVec3)
     if ((objectVec3.x - zoneVec3.x)^2 + (objectVec3.z - zoneVec3.z)^2)^0.5 <= zone.radius then
         return true
     end
@@ -683,7 +701,6 @@ function Spawn:SpawnFromVec3(vec3, alt)
         end
     end
     for _, unitData in pairs(self._spawnTemplate.units) do
-        self:Error("OLD VEC's: X = %.5f | Y = %.5f", unitData.x, unitData.y)
         local sX = unitData.x or 0
         local sY = unitData.y  or 0
         local bX = self._spawnTemplate.route.points[1].x or self._spawnTemplate.x
@@ -693,7 +710,6 @@ function Spawn:SpawnFromVec3(vec3, alt)
         unitData.alt = alt
         unitData.x = tX
         unitData.y = tY
-        self:Error("OLD VEC's: X = %.5f | Y = %.5f", unitData.x, unitData.y)
     end
     self._spawnTemplate.route.points[1].alt = alt
     self._spawnTemplate.route.points[1].x = vec3.x
@@ -794,10 +810,10 @@ function Spawn:_addToWorld()
         self:Debug("Spawn:_addToWorld() | %s has been added into the world", self._spawnTemplate.units[1].name)
     else
         if self.payload then
-            self._spawnTemplate.units[self.payloadId] = self.payload
+            self._spawnTemplate.units[self.payloadId].payload = self.payload
         end
         if self.livery then
-            self._spawnTemplate.units[self.payloadId] = self.payload
+            self._spawnTemplate.units[self.liveryId].livery_id = self.payload
         end
         self.DCSGroup = addGroup(self.countryId, self.categoryId, self._spawnTemplate)
         self.spawnCount = self.spawnCount + 1
