@@ -8,27 +8,8 @@ local scheduleFunction = timer.scheduleFunction
 local getModelTime = timer.getTime
 local logwrite = log.write
 local format = string.format
-
-local function deepCopy(object)
-    local copies = {}
-    local function recursiveCopy(object)
-        if type(object) ~= "table" then return object end
-        if copies[object] then return copies[object] end
-        local copy = {}
-        copies[object] = copy
-        for key, value in pairs(object) do
-            copy[recursiveCopy(key)] = recursiveCopy(value)
-        end
-        return setmetatable(copy, getmetatable(object))
-    end
-    return recursiveCopy(object)
-end
-
-local function inherit(child, parent)
-    local Child = deepCopy(child)
-    setmetatable(child, {__index = parent})
-    return Child
-end
+local deepCopy
+local inherit
 
 -------------------------------------------
 
@@ -71,7 +52,7 @@ Spawn.Waypoint = {
 -------------------------------------------
 
 function Spawn:New(templateName, nickname)
-    local self = inherit(self, Log)
+    local self = inherit(self, Spawn)
     self.baseTemplate, self.staticTemplate = self:GetTemplate(templateName)
     if not self.baseTemplate then
         self:Error("Spawn:New() | couldn't find template %s in database", templateName)
@@ -104,7 +85,7 @@ function Spawn:New(templateName, nickname)
 end
 
 function Spawn:NewFromTemplate(template, nickname, staticTemplate)
-    local self = inherit(self, Log)
+    local self = inherit(self, Spawn)
     self.baseTemplate = deepCopy(template)
     self.staticTemplate = staticTemplate
     self.nickname = nickname
@@ -183,7 +164,6 @@ function Spawn:NewFromVarargs(varargs)
 end
 
 ---------------------------------------------
--- setters
 
 function Spawn:SetKeepNames(keepGroupName, keepUnitNames)
     self.keepGroupName = keepGroupName
@@ -226,7 +206,6 @@ function Spawn:SetDebugLevel(level)
 end
 
 -------------------------------------------
--- getters
 
 function Spawn:GetDCSGroup()
     if self.DCSGroup:isExist() then
@@ -463,7 +442,6 @@ function Spawn:GetTerminalData(airbaseName, terminals)
             if not spot.TO_AC then
                 for _, termIndex in pairs(terminals) do
                     if spot.Term_Index == termIndex then
-                        self:Debug("Term_Index == %d", termIndex)
                         terminalData[#terminalData+1] = {
                             termIndex = spot.Term_Index,
                             termVec3 = spot.vTerminalPos
@@ -478,10 +456,8 @@ function Spawn:GetTerminalData(airbaseName, terminals)
 end
 
 -------------------------------------------
--- useful
 
 function Spawn:MarkParkingSpots(airbaseName)
-    self:Debug("Spawn:MarkParkingSpots() | marking parking spots for airbase: %s", airbaseName)
     local airbase = Airbase.getByName(airbaseName)
     if airbase then
         for _, spot in pairs(airbase:getParking()) do
@@ -513,7 +489,6 @@ function Spawn:AddStaticTemplate(template)
 end
 
 -------------------------------------------
--- spawners
 
 function Spawn:SpawnToWorld()
     self._spawnTemplate = deepCopy(self.baseTemplate)
@@ -668,7 +643,6 @@ function Spawn:SpawnFromAirbase(airbaseName, takeoff, terminals)
 end
 
 -------------------------------------------
--- template preperation
 
 function Spawn:_InitializeTemplate()
     self:_InitializeNames()
@@ -699,7 +673,6 @@ function Spawn:_InitializeNames()
 end
 
 -------------------------------------------
--- add template to world
 
 function Spawn:_AddToWorld()
     if self.staticTemplate then
@@ -726,12 +699,33 @@ function Spawn:_AddToWorld()
 end
 
 -------------------------------------------
--- internals
-
--------------------------------------------
--- logging and database initialization
 
 do
+-------------------------------------------
+
+    function deepCopy(object)
+        local copies = {}
+        local function recursiveCopy(object)
+            if type(object) ~= "table" then return object end
+            if copies[object] then return copies[object] end
+            local copy = {}
+            copies[object] = copy
+            for key, value in pairs(object) do
+                copy[recursiveCopy(key)] = recursiveCopy(value)
+            end
+            return setmetatable(copy, getmetatable(object))
+        end
+        return recursiveCopy(object)
+    end
+
+    function inherit(child, parent)
+        local Child = deepCopy(child)
+        setmetatable(child, {__index = parent})
+        return Child
+    end
+
+-------------------------------------------
+
     local DebugLevels = {
         {["method"] = "Alert", ["level"] = "ALERT"},
         {["method"] = "Error", ["level"] = "ERROR"},
@@ -739,6 +733,7 @@ do
         {["method"] = "Info", ["level"] = "INFO"},
         {["method"] = "Debug", ["level"] = "DEBUG"}
     }
+
     for level, data in pairs(DebugLevels) do
         Spawn[data.method] = function(self, message, ...)
             if self.DebugLevel and self.DebugLevel < level then
@@ -748,12 +743,15 @@ do
         end
     end
 
+-------------------------------------------
+
     local categoryId = {
-        ["plane"] = Unit.Category.AIRPLANE,
-        ["helicopter"] = Unit.Category.HELICOPTER,
-        ["vehicle"] = Unit.Category.GROUND_UNIT,
-        ["ship"] = Unit.Category.SHIP,
+        ["plane"] = Group.Category.AIRPLANE,
+        ["helicopter"] = Group.Category.HELICOPTER,
+        ["vehicle"] = Group.Category.GROUND_UNIT,
+        ["ship"] = Group.Category.SHIP,
     }
+
     for sideName, coalitionData in pairs(env.mission.coalition) do
         if sideName == "neutrals" then sideName = "neutral" end
         if type(coalitionData) == "table" then
