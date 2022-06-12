@@ -24,6 +24,12 @@ local function deepCopy(object)
     return recursiveCopy(object)
 end
 
+local function inherit(child, parent)
+    local Child = deepCopy(child)
+    setmetatable(child, {__index = parent})
+    return Child
+end
+
 -------------------------------------------
 
 Spawn = {}
@@ -65,7 +71,7 @@ Spawn.Waypoint = {
 -------------------------------------------
 
 function Spawn:New(templateName, nickname)
-    local self = Util.DeepCopy(setmetatable({}, {__index = Spawn}))
+    local self = inherit(self, Log)
     self.baseTemplate, self.staticTemplate = self:GetTemplate(templateName)
     if not self.baseTemplate then
         self:Error("Spawn:New() | couldn't find template %s in database", templateName)
@@ -98,7 +104,7 @@ function Spawn:New(templateName, nickname)
 end
 
 function Spawn:NewFromTemplate(template, nickname, staticTemplate)
-    local self = deepCopy(setmetatable({}, {__index = Spawn}))
+    local self = inherit(self, Log)
     self.baseTemplate = deepCopy(template)
     self.staticTemplate = staticTemplate
     self.nickname = nickname
@@ -238,6 +244,13 @@ function Spawn:GetPayload(unitName)
     if unitsByName[unitName] then
         local payload = deepCopy(unitsByName[unitName].payload)
         return payload
+    end
+end
+
+function Spawn:GetLivery(unitName)
+    if unitsByName[unitName] then
+        local liveryId = unitsByName[unitName].livery_id
+        return liveryId
     end
 end
 
@@ -637,11 +650,10 @@ function Spawn:SpawnFromAirbase(airbaseName, takeoff, terminals)
             if type(terminals) ~= "table" and type(terminals) == "number" then
                 terminals = {terminals}
             end
-            local terminalData = self:_getTerminalData(airbaseName, terminals)
+            local terminalData = self:GetTerminalData(airbaseName, terminals)
             self._spawnTemplate.route.points[1].x = terminalData[1].termVec3.x
             self._spawnTemplate.route.points[1].y = terminalData[1].termVec3.z
             for unitId, unitData in ipairs(self._spawnTemplate.units) do
-                self:Debug("setting unit %s to Term_Index %d", unitData.name, terminalData[unitId].termIndex)
                 unitData.parking = terminalData[unitId].termIndex
                 unitData.x = terminalData[unitId].termVec3.x
                 unitData.y = terminalData[unitId].termVec3.z
@@ -797,11 +809,9 @@ end
 
 --Spawn:New("tank-1"):SpawnFromZoneOnNearestRoad("spawn zone") -- will spawn outside of the zone
 
---local spawnZone = Spawn:GetZoneTemplate("spawn zone")
---local spawnZoneVec3 = Spawn:GetZoneVec3(spawnZone)
 --Spawn:New("tank-2"):SpawnFromZone("spawn zone")
 --[[
-local spawnUnit = Spawn:NewUnitFromType({
+local spawnUnit = Spawn:NewFromVarargs({
     staticTemplate = true,
     name = "Test Unit",
     type = "Workshop A",
@@ -811,4 +821,4 @@ local spawnUnit = Spawn:NewUnitFromType({
 })
 spawnUnit:SpawnFromZone("spawn zone")
 ]]
---Spawn:New("hog"):SpawnFromAirbase("Incirlik", Spawn.Takeoff.FromParkingHot, {15, 17, 23})
+Spawn:New("hog"):SpawnFromAirbase("Incirlik", Spawn.Takeoff.FromParkingHot, {15, 17, 23})
