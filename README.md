@@ -30,63 +30,56 @@ DCSStaticObject   | object | dcs static object returned upon spawn
 _spawnTemplate    | table  | copied template of baseTemplate that is manipulated for each spawn
 
 ### *Methods*
-Field                       | Params | Description
+Field                       | Description
 ----------------------------|------------
 New                         | creates new instance of spawn object from a template name
 NewFromTemplate             | creates a new instance of spawn object from a custom template
-
-SetTemplateNames            | 
-SetNickname                 |  
+SetTemplateNames            |
+SetNickname                 |
 SetScheduler                |  
-SetPayload                  |
-SetDebugLevel               |
-
-GetDCSGroup                 |
-GetDCSStaticObject          |
-GetPayload                  |
-GetGroupTemplate            |
-GetUnitTemplate             |
-GetStaticTemplate           |
-GetBaseTemplate
-GetSpawnTemplate            |
-GetStaticSpawnTemplate      |
-GetZoneTemplate             |
-GetQuadZonePoints           |
-GetZoneVec3                 |
-GetOpenParkingSpots         |
-GetFirstOpenParkingSpot     |
-GetTerminalData             |
-
-MarkParkingSpots            |
-ScheduleFunction            |
-
-GetQuadZonePoints           |
-GroupInQuadZone             |
-UnitInQuadZone              |
-StaticInQuadZone            |
-GroupInPolygon              |
-UnitInPolygon               |
-StaticInPolygon             |
-ObjectInPolygonZone         |
-
-SpawnToWorld                |
-SpawnFromTemplate           |
-SpawnFromZone               |
-SpawnFromRandomZone         | 
-SpawnFromRandomVec3InZone   |
-SpawnFromRandomVec3InRadius |
-SpawnFromVec3               |
-SpawnFromAirbaseRunway      |
-SpawnFromAirbaseParkingHot  |
-SpawnFromAirbaseParkingCold |
-SpawnFromAirbase            |
-
-Alert                       |
-Error                       |
-Warning                     |
-Info                        |
-Debug                       |
-
-_prepareTemplate            |
-_prepareNames               |
-_addToWorld                 |
+SetPayload                  |  
+SetDebugLevel               |  
+GetDCSGroup                 |  
+GetDCSStaticObject          |  
+GetPayload                  |  
+GetGroupTemplate            |  
+GetUnitTemplate             |  
+GetStaticTemplate           |  
+GetBaseTemplate             |  
+GetSpawnTemplate            |  
+GetStaticSpawnTemplate      |  
+GetZoneTemplate             |  
+GetQuadZonePoints           |  
+GetZoneVec3                 |  
+GetOpenParkingSpots         |  
+GetFirstOpenParkingSpot     |  
+GetTerminalData             |  
+MarkParkingSpots            |  
+ScheduleFunction            |  
+GetQuadZonePoints           |  
+GroupInQuadZone             |  
+UnitInQuadZone              |  
+StaticInQuadZone            |  
+GroupInPolygon              |  
+UnitInPolygon               |  
+StaticInPolygon             |  
+ObjectInPolygonZone         |  
+SpawnToWorld                |  
+SpawnFromTemplate           |  
+SpawnFromZone               |  
+SpawnFromRandomZone         |  
+SpawnFromRandomVec3InZone   |  
+SpawnFromRandomVec3InRadius |  
+SpawnFromVec3               |  
+SpawnFromAirbaseRunway      |  
+SpawnFromAirbaseParkingHot  |  
+SpawnFromAirbaseParkingCold |  
+SpawnFromAirbase            |  
+Alert                       |  
+Error                       |  
+Warning                     |  
+Info                        |  
+Debug                       |  
+_InitializeTemplate         |  
+_InitializeNames            |  
+_AddToWorld                 |  
