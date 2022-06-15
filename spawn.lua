@@ -66,12 +66,12 @@ local logwrite = log.write
 local format = string.format
 local deepCopy
 local inherit
-local groupsByName = {}
-local unitsByName = {}
-local staticsByName = {}
-local zonesByName = {}
-
--------------------------------------------
+local database = {
+    ["groupsByName"] = {},
+    ["unitsByName"] = {},
+    ["staticsByName"] = {},
+    ["zonesByName"] = {}
+}
 
 Spawn = {}
 Spawn.Version = "0.0.1"
@@ -90,7 +90,6 @@ Spawn.Takeoff = {
     ["FromParkingHot"] =  {name = "Takeoff from parking hot", type = "TakeOffParkingHot", action = "From Parking Area Hot"},
     ["FromParkingCold"] = {name = "Takeoff from parking",     type = "TakeOffParking",    action = "From Parking Area"}
 }
-
 Spawn.Waypoint = {
     ["TurningPoint"]          = {name = "Turning point",            type = "Turning Point",     action = "Turning Point" },
     ["FlyOverPoint"]          = {name = "Fly over point",           type = "Turning Point",     action = "Fly Over Point"},
@@ -110,8 +109,6 @@ Spawn.Waypoint = {
     ["EchelonR"] 	    	  = {name = "Echelon Right",            type = "Turning Point",     action = "EchelonR"},
     ["CustomForm"] 	          = {name = "Custom",                   type = "Turning Point",     action = "Custom"},
 }
-
--------------------------------------------
 
 --[[ Create a new instance of a spawn object by name
 - @param #Spawn self
@@ -134,9 +131,9 @@ function Spawn:New(templateName, nickname)
     self.keepUnitNames = nil
 
     self.scheduledFunction = nil
-    self.scheduledCallback = nil
+    self.scheduledMethod = nil
     self.scheduledParams = nil
-    self.scheduledTime = nil
+    self.scheduledDelay = nil
 
     self.payloadId = nil
     self.payload = nil
@@ -169,9 +166,9 @@ function Spawn:NewFromTemplate(template, nickname, staticTemplate)
     self.keepGroupName = nil
     self.keepUnitNames = nil
     self.scheduledFunction = nil
-    self.scheduledCallback = nil
+    self.scheduledMethod = nil
     self.scheduledParams = nil
-    self.scheduledTime = nil
+    self.scheduledDelay = nil
 
     self.DCSGroup = nil
     self.DCSStaticObject = nil
@@ -224,8 +221,6 @@ function Spawn:NewFromVarargs(varargs)
     return self
 end
 
----------------------------------------------
-
 --[[ Set the Spawn object to keep group or unit names
 - @param #Spawn self
 - @param #boolean keepGroupName
@@ -248,18 +243,18 @@ function Spawn:SetNickname(nickname)
     return self
 end
 
---[[ Set the Spawn object to use a specific callback for spawning on a schedule
+--[[ Set the Spawn object to use a specific method for spawning on a schedule
 - @param #Spawn self
-- @param #function callback
+- @param #function method
 - @param #array params
-- @param #number timer
+- @param #number delay
 - @return #Spawn self
 ]]
-function Spawn:SetScheduler(callback, params, time)
+function Spawn:SetScheduler(method, params, delay)
     self.scheduledFunction = true
-    self.scheduledCallback = callback
+    self.scheduledMethod = method
     self.scheduledParams = params
-    self.scheduledTime = time
+    self.scheduledDelay = delay
     return self
 end
 
@@ -301,8 +296,6 @@ function Spawn:SetDebugLevel(level)
     return self
 end
 
--------------------------------------------
-
 --[[ Get the currently alive DCS Class Group
 - @param #Spawn self
 - @return #DCSGroup
@@ -329,8 +322,8 @@ end
 - @return #table payload
 ]]
 function Spawn:GetPayload(unitName)
-    if unitsByName[unitName] then
-        local payload = deepCopy(unitsByName[unitName].payload)
+    if database.unitsByName[unitName] then
+        local payload = deepCopy(database.unitsByName[unitName].payload)
         return payload
     end
 end
@@ -341,8 +334,8 @@ end
 - @return #string liveryName
 ]]
 function Spawn:GetLiveryName(unitName)
-    if unitsByName[unitName] then
-        local liveryName = unitsByName[unitName].livery_id
+    if database.unitsByName[unitName] then
+        local liveryName = database.unitsByName[unitName].livery_id
         return liveryName
     end
 end
@@ -353,9 +346,9 @@ end
 - @return #table
 ]]
 function Spawn:GetGroupTemplate(groupName)
-    if groupsByName[groupName] then
+    if database.groupsByName[groupName] then
         self:Info("Spawn:GetGroupTemplate() | returning group template: "..groupName)
-        return deepCopy(groupsByName[groupName])
+        return deepCopy(database.groupsByName[groupName])
     end
 end
 
@@ -365,9 +358,9 @@ end
 - @return #table
 ]]
 function Spawn:GetUnitTemplate(unitName)
-    if unitsByName[unitName] then
+    if database.unitsByName[unitName] then
         self:Info("Spawn:GetUnitTemplate() | returning unit template: "..unitName)
-        return deepCopy(unitsByName[unitName])
+        return deepCopy(database.unitsByName[unitName])
     end
 end
 
@@ -377,9 +370,9 @@ end
 - @return #table
 ]]
 function Spawn:GetStaticTemplate(staticName)
-    if staticsByName[staticName] then
+    if database.staticsByName[staticName] then
         self:Info("Spawn:GetStaticTemplate() | returning static template: "..staticName)
-        return deepCopy(staticsByName[staticName]), true
+        return deepCopy(database.staticsByName[staticName]), true
     end
 end
 
@@ -389,15 +382,15 @@ end
 - @return #table
 ]]
 function Spawn:GetTemplate(templateName)
-    if groupsByName[templateName] then
+    if database.groupsByName[templateName] then
         self:Info("Spawn:GetTemplate() | returning group template: "..templateName)
-        return deepCopy(groupsByName[templateName])
-    elseif unitsByName[templateName] then
+        return deepCopy(database.groupsByName[templateName])
+    elseif database.unitsByName[templateName] then
         self:Info("Spawn:GetTemplate() | returning unit template: "..templateName)
-        return deepCopy(unitsByName[templateName])
-    elseif staticsByName[templateName] then
+        return deepCopy(database.unitsByName[templateName])
+    elseif database.staticsByName[templateName] then
         self:Info("Spawn:GetTemplate() | returning static template: "..templateName)
-        return deepCopy(staticsByName[templateName]), true
+        return deepCopy(database.staticsByName[templateName]), true
     end
 end
 
@@ -503,8 +496,8 @@ end
 - @return #table
 ]]
 function Spawn:GetZoneTemplate(zoneName)
-    if zonesByName[zoneName] then
-        return deepCopy(zonesByName[zoneName])
+    if database.zonesByName[zoneName] then
+        return deepCopy(database.zonesByName[zoneName])
     end
 end
 
@@ -640,8 +633,6 @@ function Spawn:GetTerminalData(airbaseName, spots)
     return self
 end
 
--------------------------------------------
-
 --[[ Mark the parking spots at an airbase by name
 - @param #Spawn self
 - @param #string airbaseName
@@ -656,41 +647,54 @@ function Spawn:MarkParkingSpots(airbaseName)
     end
 end
 
---[[ Spawn an object by a callback with a delay and any parameters
+--[[ Spawn an object with a spawn method to be scheduled
 - @param #Spawn self
-- @param #function callback
+- @param #function method
 - @param #array params
-- @param #number timer
+- @param #number delay
 - @return none
 ]]
-function Spawn:SpawnScheduled(callback, params, timer)
-    callback = self.scheduledCallback or callback
+function Spawn:SpawnScheduled(method, params, delay)
+    method = self.scheduledMethod or method
     params = self.scheduledParams or params
-    timer = self.scheduledTime or timer
-    scheduleFunction(function()
-        callback(unpack(params))
-        self:SpawnScheduled(callback, params, timer)
-    end
-    , nil, getModelTime() + timer)
+    delay = self.scheduledDelay or delay
+    scheduleFunction(function() method(unpack(params)) end, nil, getModelTime() + delay)
 end
 
+--[[ Add a group template to the database
+- @param #Spawn self
+- @param #table template
+- @return none
+]]
 function Spawn:AddGroupTemplate(template)
-    groupsByName[template.name] = deepCopy(template)
+    database.groupsByName[template.name] = deepCopy(template)
     for _, unitTemplate in pairs(template.units) do
         self:AddUnitTemplate(unitTemplate)
     end
 end
 
+--[[ Add a unit template to the database
+- @param #Spawn self
+- @param #table template
+- @return none
+]]
 function Spawn:AddUnitTemplate(template)
-    unitsByName[template.name] = deepCopy(template)
+    database.unitsByName[template.name] = deepCopy(template)
 end
 
+--[[ Add a static template to the database
+- @param #Spawn self
+- @param #table template
+- @return none
+]]
 function Spawn:AddStaticTemplate(template)
-    staticsByName[template.units[1].name] = deepCopy(template)
+    database.staticsByName[template.units[1].name] = deepCopy(template)
 end
 
--------------------------------------------
-
+--[[ Spawn the object to the world
+- @param #Spawn self
+- @return #Spawn self
+]]
 function Spawn:SpawnToWorld()
     self._spawnTemplate = deepCopy(self.baseTemplate)
     self:_InitializeTemplate()
@@ -706,34 +710,57 @@ function Spawn:Respawn()
     return self
 end
 
-function Spawn:SpawnFromTemplate(template, country, category, static)
+--[[ Spawn an object from a template
+- @param #Spawn self
+- @param #table template
+- @param #number countryId
+- @param #number categoryId
+- @param #boolean static
+- @return #Spawn self
+]]
+function Spawn:SpawnFromTemplate(template, countryId, categoryId, static)
     if static then
-        local staticObject = addStaticObject(country, template)
-        template.countryId = country
+        local DCSStaticObject = addStaticObject(countryId, template)
+        template.countryId = countryId
         self:AddStaticTemplate(template)
-        return staticObject
     else
-        local group = addGroup(country, category, template)
-        template.countryId = country
-        template.categoryId = category
+        local DCSGroup = addGroup(countryId, categoryId, template)
+        template.countryId = countryId
+        template.categoryId = categoryId
         self:AddGroupTemplate(template)
-        return group
     end
+    return Spawn:New(template.name)
 end
 
-
+--[[ Spawn an object from a zone by name
+- @param #Spawn self
+- @param #string zoneName
+- @param #number alt
+- @return #Spawn self
+]]
 function Spawn:SpawnFromZone(zoneName, alt)
     local spawnZoneVec3 = self:GetZoneVec3(zoneName)
     self:SpawnFromVec3(spawnZoneVec3, alt)
     return self
 end
 
+--[[ Spawn an object from a zone on the nearest road
+- @param #Spawn self
+- @param #string zoneName
+- @return #Spawn self
+]]
 function Spawn:SpawnFromZoneOnNearestRoad(zoneName)
     local spawnZoneVec3 = self:GetZoneVec3(zoneName)
     self:SpawnFromVec3OnNearestRoad(spawnZoneVec3)
     return self
 end
 
+--[[ Spawn an object from a random zone from a list
+- @param #Spawn self
+- @param #array zoneList
+- @param #number alt
+- @return #Spawn self
+]]
 function Spawn:SpawnFromRandomZone(zoneList, alt)
     local randomNum = math.random(1, #zoneList)
     local randomZone = zoneList[randomNum]
@@ -741,6 +768,12 @@ function Spawn:SpawnFromRandomZone(zoneList, alt)
     return self
 end
 
+--[[ Spawn an object from a random vec3 in a zone
+- @param #Spawn self
+- @param #string zoneName
+- @param #number alt
+- @return #Spawn self
+]]
 function Spawn:SpawnFromRandomVec3InZone(zoneName, alt)
     local zone = self:GetZoneTemplate(zoneName)
     local spawnZoneVec3 = zone.vec3
@@ -752,6 +785,14 @@ function Spawn:SpawnFromRandomVec3InZone(zoneName, alt)
     return self
 end
 
+--[[ Spawn an object from a random vec3 within a random radius
+- @param #Spawn self
+- @param #table vec3
+- @param #number minRadius
+- @param #number maxRadius
+- @param #number alt
+- @return #Spawn self
+]]
 function Spawn:SpawnFromRandomVec3InRadius(vec3, minRadius, maxRadius, alt)
     local vec3 = deepCopy(vec3)
     local radius = math.random(minRadius, maxRadius)
@@ -762,6 +803,11 @@ function Spawn:SpawnFromRandomVec3InRadius(vec3, minRadius, maxRadius, alt)
     return self
 end
 
+--[[ Spawn an object from a vec3 on the nearest road
+- @param #Spawn self
+- @param #table vec3
+- @return #Spawn self
+]]
 function Spawn:SpawnFromVec3OnNearestRoad(vec3)
     local x, z = land.getClosestPointOnRoads("roads", vec3.x, vec3.z)
     vec3.x = x
@@ -770,6 +816,11 @@ function Spawn:SpawnFromVec3OnNearestRoad(vec3)
     return self
 end
 
+--[[ Spawn an object from a vec3
+- @param #Spawn self
+- @param #table vec3
+- @return #Spawn self
+]]
 function Spawn:SpawnFromVec3(vec3, alt)
     self._spawnTemplate = deepCopy(self.baseTemplate)
     if self.staticTemplate or self.categoryId == Group.Category.GROUND then
@@ -802,21 +853,46 @@ function Spawn:SpawnFromVec3(vec3, alt)
     return self
 end
 
+--[[ Spawn an object from a airbase on the runway
+- @param #Spawn self
+- @param #string airbaseName
+- @param #array spots
+- @return #Spawn self
+]]
 function Spawn:SpawnFromAirbaseRunway(airbaseName, spots)
     self:SpawnFromAirbase(airbaseName, Spawn.Takeoff.FromRunway, spots)
     return self
 end
 
+--[[ Spawn an object at an airbase in a parking spot hot
+- @param #Spawn self
+- @param #string airbaseName
+- @param #array spots
+- @return #Spawn self
+]]
 function Spawn:SpawnFromAirbaseParkingHot(airbaseName, spots)
     self:SpawnFromAirbase(airbaseName, Spawn.Takeoff.FromParkingHot, spots)
     return self
 end
 
+--[[ Spawn an object at an airbase in a parking spot cold
+- @param #Spawn self
+- @param #string airbaseName
+- @param #array spots
+- @return #Spawn self
+]]
 function Spawn:SpawnFromAirbaseParkingCold(airbaseName, spots)
     self:SpawnFromAirbase(airbaseName, Spawn.Takeoff.FromParkingCold, spots)
     return self
 end
 
+--[[ Spawn an object at an airbase with any takeoff type and any spots
+- @param #Spawn self
+- @param #string airbaseName
+- @param #enum takeoff
+- @param #array spots
+- @return #Spawn self
+]]
 function Spawn:SpawnFromAirbase(airbaseName, takeoff, spots)
     self._spawnTemplate = deepCopy(self.baseTemplate)
     local spawnAirbase = Airbase.getByName(airbaseName)
@@ -852,14 +928,20 @@ function Spawn:SpawnFromAirbase(airbaseName, takeoff, spots)
     end
 end
 
--------------------------------------------
-
+--[[ Initializes the templates group and unit names then adds to world
+- @param #Spawn self
+- @return #Spawn self
+]]
 function Spawn:_InitializeTemplate()
     self:_InitializeNames()
     self:_AddToWorld()
     return self
 end
 
+--[[ Initialize the templates group and unit names
+- @param #Spawn self
+- @return #Spawn self
+]]
 function Spawn:_InitializeNames()
     if not self.keepGroupName then
         if self.nickname then
@@ -882,8 +964,11 @@ function Spawn:_InitializeNames()
     return self
 end
 
--------------------------------------------
 
+--[[ Add the spawn object into the world
+- @param #Spawn self
+- @return #Spawn self
+]]
 function Spawn:_AddToWorld()
     if self.staticTemplate then
         self.DCSStaticObject = addStaticObject(self.countryId, self._spawnTemplate.units[1])
@@ -908,11 +993,9 @@ function Spawn:_AddToWorld()
     return self
 end
 
--------------------------------------------
+--[[ Spawn Class Methods End ]]--
 
 do
--------------------------------------------
-
     function deepCopy(object)
         local copies = {}
         local function recursiveCopy(object)
@@ -934,8 +1017,6 @@ do
         return Child
     end
 
--------------------------------------------
-
     local DebugLevels = {
         {["method"] = "Alert", ["level"] = "ALERT"},
         {["method"] = "Error", ["level"] = "ERROR"},
@@ -952,8 +1033,6 @@ do
             logwrite(self.Source, log[data.level], format(message, ...))
         end
     end
-
--------------------------------------------
 
     local categoryId = {
         ["plane"] = Group.Category.AIRPLANE,
@@ -973,23 +1052,23 @@ do
                                 if groupData.lateActivation then
                                     groupData.lateActivation = false
                                 end
-                                groupsByName[groupData.name] = deepCopy(groupData)
-                                groupsByName[groupData.name].countryId = countryData.id
-                                groupsByName[groupData.name].categoryId = categoryId[categoryName]
+                                database.groupsByName[groupData.name] = deepCopy(groupData)
+                                database.groupsByName[groupData.name].countryId = countryData.id
+                                database.groupsByName[groupData.name].categoryId = categoryId[categoryName]
                                 for unitId, unitData in pairs(groupData.units) do
-                                    unitsByName[unitData.name] = deepCopy(groupData)
-                                    unitsByName[unitData.name].name = unitData.name
-                                    unitsByName[unitData.name].units = {}
-                                    unitsByName[unitData.name].units[1] = deepCopy(unitData)
-                                    unitsByName[unitData.name].countryId = countryData.id
-                                    unitsByName[unitData.name].categoryId = categoryId[categoryName]
+                                    database.unitsByName[unitData.name] = deepCopy(groupData)
+                                    database.unitsByName[unitData.name].name = unitData.name
+                                    database.unitsByName[unitData.name].units = {}
+                                    database.unitsByName[unitData.name].units[1] = deepCopy(unitData)
+                                    database.unitsByName[unitData.name].countryId = countryData.id
+                                    database.unitsByName[unitData.name].categoryId = categoryId[categoryName]
                                 end
                             end
                         elseif categoryName == "static" then
                             for _, staticData in pairs(objectData.group) do
                                 local staticName = staticData.units[1].name
-                                staticsByName[staticName] = deepCopy(staticData)
-                                staticsByName[staticName].countryId = countryData.id
+                                database.staticsByName[staticName] = deepCopy(staticData)
+                                database.staticsByName[staticName].countryId = countryData.id
                             end
                         end
                     end
@@ -1000,18 +1079,18 @@ do
 
     for _, zones in pairs(env.mission.triggers) do
         for _, zoneData in pairs(zones) do
-            zonesByName[zoneData.name] = deepCopy(zoneData)
-            zonesByName[zoneData.name].vec3 = {}
-            zonesByName[zoneData.name].vec3.x = zoneData.x
-            zonesByName[zoneData.name].vec3.y = land.getHeight({x = zoneData.x, y = zoneData.y})
-            zonesByName[zoneData.name].vec3.z = zoneData.y
+            database.zonesByName[zoneData.name] = deepCopy(zoneData)
+            database.zonesByName[zoneData.name].vec3 = {}
+            database.zonesByName[zoneData.name].vec3.x = zoneData.x
+            database.zonesByName[zoneData.name].vec3.y = land.getHeight({x = zoneData.x, y = zoneData.y})
+            database.zonesByName[zoneData.name].vec3.z = zoneData.y
         end
     end
 end
 
 Spawn:Info("successfully loaded version %s", Spawn.Version)
+Database = deepCopy(database)
 
--------------------------------------------
 -- testing
 
 --local spawnGroup = Spawn:NewFromTemplate(Spawn:GetGroupTemplate("hog"))
@@ -1053,5 +1132,4 @@ spawnUnit:SpawnFromZone("spawn zone")
     staticTemplate
     waypoint
 ]]
-local spawn = Spawn:New("static unit")
-spawn:SpawnScheduled(Spawn.SpawnFromRandomVec3InZone, {spawn, "static spawn"}, 5)
+local spawn = Spawn:New("unit ground"):SpawnFromZone("unit spawn")
