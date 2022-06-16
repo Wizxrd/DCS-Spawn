@@ -73,6 +73,11 @@ local database = {
     ["zonesByName"] = {}
 }
 
+---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
+
 Spawn = {}
 Spawn.Version = "0.0.1"
 Spawn.Source = "Spawn.lua"
@@ -384,10 +389,10 @@ end
 function Spawn:GetTemplate(templateName)
     if database.groupsByName[templateName] then
         self:Info("Spawn:GetTemplate() | returning group template: "..templateName)
-        return deepCopy(database.groupsByName[templateName])
+        return deepCopy(database.groupsByName[templateName]), false
     elseif database.unitsByName[templateName] then
         self:Info("Spawn:GetTemplate() | returning unit template: "..templateName)
-        return deepCopy(database.unitsByName[templateName])
+        return deepCopy(database.unitsByName[templateName]), false
     elseif database.staticsByName[templateName] then
         self:Info("Spawn:GetTemplate() | returning static template: "..templateName)
         return deepCopy(database.staticsByName[templateName]), true
@@ -497,7 +502,10 @@ end
 ]]
 function Spawn:GetZoneTemplate(zoneName)
     if database.zonesByName[zoneName] then
+        self:Debug("returning zone %s", zoneName)
         return deepCopy(database.zonesByName[zoneName])
+    else
+        self:Alert("fuck!")
     end
 end
 
@@ -971,10 +979,17 @@ end
 ]]
 function Spawn:_AddToWorld()
     if self.staticTemplate then
-        self.DCSStaticObject = addStaticObject(self.countryId, self._spawnTemplate.units[1])
-        self.spawnCount = self.spawnCount + 1
-        self:Debug("Spawn:_AddToWorld() | %s has been added into the world", self._spawnTemplate.units[1].name)
-        self:AddStaticTemplate(self._spawnTemplate)
+        if self._spawnTemplate.units[1].category == "Heliports" then
+            coalition.addGroup(self.countryId, -1, self._spawnTemplate)
+            self.spawnCount = self.spawnCount + 1
+            self:Debug("Spawn:_AddToWorld() | %s has been added into the world", self._spawnTemplate.units[1].name)
+            self:AddStaticTemplate(self._spawnTemplate)
+        else
+            self.DCSStaticObject = addStaticObject(self.countryId, self._spawnTemplate.units[1])
+            self.spawnCount = self.spawnCount + 1
+            self:Debug("Spawn:_AddToWorld() | %s has been added into the world", self._spawnTemplate.units[1].name)
+            self:AddStaticTemplate(self._spawnTemplate)
+        end
     else
         if self.payload then
             self._spawnTemplate.units[self.payloadId].payload = self.payload
@@ -993,7 +1008,10 @@ function Spawn:_AddToWorld()
     return self
 end
 
---[[ Spawn Class Methods End ]]--
+---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
 
 do
     function deepCopy(object)
@@ -1013,7 +1031,7 @@ do
 
     function inherit(child, parent)
         local Child = deepCopy(child)
-        setmetatable(child, {__index = parent})
+        setmetatable(Child, {__index = parent})
         return Child
     end
 
@@ -1088,48 +1106,10 @@ do
     end
 end
 
+---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
+
 Spawn:Info("successfully loaded version %s", Spawn.Version)
 Database = deepCopy(database)
-
--- testing
-
---local spawnGroup = Spawn:NewFromTemplate(Spawn:GetGroupTemplate("hog"))
---spawnGroup:SpawnToWorld()
-
---Spawn:New("tank-1"):SpawnFromZoneOnNearestRoad("spawn zone") -- will spawn outside of the zone
-
---Spawn:New("tank-2"):SpawnFromZone("spawn zone")
---[[
-local spawnUnit = Spawn:NewFromVarargs({
-    staticTemplate = true,
-    name = "Test Unit",
-    type = "Workshop A",
-    countryId = country.id.USA,
-    category = "Fortifications",
-    shapeName = "tec_A",
-})
-spawnUnit:SpawnFromZone("spawn zone")
-]]
---[[
-{
-    type -- required both static and unit
-
-    countryId -- required unit
-    categoryId -- required unit
-
-    category -- required static
-    shapeName -- required static
-
-    -- optional
-    skill
-    canDrive
-    alt
-    altType
-    heading
-    type
-    action
-    name
-    staticTemplate
-    waypoint
-]]
-local spawn = Spawn:New("unit ground"):SpawnFromZone("unit spawn")
