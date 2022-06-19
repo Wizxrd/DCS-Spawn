@@ -28,4 +28,4 @@ A dynamic way to spawn groups, units, and statics wrapped all into one module fo
 - Mark parking spots at an airbase to determine viable parking spot locations
 - Add group, unit, and static Templates into the global `Database`
 
-# Introduction
+# **Introduction**
