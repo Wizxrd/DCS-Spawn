@@ -1,6 +1,6 @@
 --[[
 
-@script DCS-Spawn
+@class Spawn
 
 @authors Wizard
 

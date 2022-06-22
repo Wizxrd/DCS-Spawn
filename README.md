@@ -1,4 +1,4 @@
-# ***DCS-Spawn***
+# ***Spawn***
 
 **Authors:** Wizard  
 
