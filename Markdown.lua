@@ -217,7 +217,7 @@ local function getBlock(lines, index)
                 -- do nothing if github, why link to readme's
             elseif line:match("@version") then
                 local version = line:match("@%a+%s(.*)")
-                block[#block+1] = "**\nVersion:** "..version.."  \n"
+                block[#block+1] = "\n**Version:** "..version.."  \n"
             elseif line:match("@description") then
                 block[#block+1] = "\n**Description:**  \n"
             elseif line:match("@features") then

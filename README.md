@@ -4,6 +4,8 @@
 
 **Created:** June 7th, 2022  
 
+**Version:** 0.0.1  
+
 **Description:**  
 A dynamic spawn module for groups, units, and statics in DCS World  
 

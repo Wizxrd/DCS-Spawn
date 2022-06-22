@@ -6,6 +6,8 @@
 
 @created June 7th, 2022
 
+@version 0.0.1
+
 @github https://github.com/Wizxrd/DCS-Spawn
 
 @description
